@@ -1,5 +1,5 @@
-# cron_job
-Cronjob Scheduler is an interface that fulfills following requirements:
+# Cronjob Scheduler
+Is an interface that fulfills following requirements:
 - The CronJob's interface allows adding and removing of jobs at any time.
 - The CronJob's internal "clock" is driven by a public *void onNewTime(const struct timeval&)* method. In other words, it shouldn't use the system time for the logic.
 - In case the *timeval* passed to *onNewTime(timeval)* is 
