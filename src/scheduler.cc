@@ -40,13 +40,14 @@ void Scheduler::OnNewTime(const timeval& time) {
 void Scheduler::PastReschedule() {
   decltype(jobs) new_jobs;
   
-  for (const auto& time_job : jobs) {
+  for (auto& time_job : jobs) {
     if (time_job.second->reiterable_) {
       new_jobs.emplace(current_time_ + time_job.second->interval_,
                        std::move(time_job.second));
+    } else {
+      time_job.second.reset();
     }
   }
-  jobs.clear();
   jobs = std::move(new_jobs);
 }
 
@@ -79,8 +80,8 @@ void Scheduler::GetJobsToRun(
 }
 
 void Scheduler::Remove(std::shared_ptr<Job>& job) {
+  std::lock_guard<std::mutex> lg(lock);
   if (job) {
-    std::lock_guard<std::mutex> lg(lock);
     auto range = jobs.equal_range(current_time_ + job->interval_);
     for (auto iter = range.first; iter != range.second; ++iter) {
       if (iter->second == job) {

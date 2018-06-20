@@ -38,19 +38,31 @@ class Scheduler {
   void OnNewTime(const timeval& time);
   
   /**
-   * @brief Add a new job to the @Scheduler.
+   * @brief Add a new repetitive job to the @Scheduler.
    * @tparam _Callable - A Callable type.
    * @tparam _Args     - Callable's parameter-pack.
-   * @param reiterable - true - The job will be rescheduled.
-   *                   - false - One-shoot job.
    * @param interval   - Job's reschedule interval.
    * @param function   - Job to execute.
    * @param args       - Job's parameters.
    * @return
    */
   template <typename _Callable, typename... _Args>
-  std::shared_ptr<Job> Add(bool reiterable, int interval,
-                           _Callable&& function, _Args&& ... args);
+  std::shared_ptr<Job> Run(int interval,
+                           _Callable&& function,
+                           _Args&& ... args);
+  
+  /**
+ * @brief Add a new one-shot job to the @Scheduler.
+ * @tparam _Callable - A Callable type.
+ * @tparam _Args     - Callable's parameter-pack.
+ * @param interval   - After how many seconds the job will run once.
+ * @param function   - Job to execute.
+ * @param args       - Job's parameters.
+ * @return
+ */
+  template <typename _Callable, typename... _Args>
+  std::shared_ptr<Job> RunOnce(int interval,
+                               _Callable&& function, _Args&& ... args);
   
   /**
    * @brief Remove a job from @Scheduler.
@@ -81,23 +93,38 @@ class Scheduler {
   void GetJobsToRun(std::list<std::shared_ptr<Job>>& jobs_to_run) const;
   
   std::mutex lock;
-  unsigned int current_time_ = 0;
+  long current_time_ = 0;
   // Maps moments of time to execute jobs with the corresponding jobs.
-  std::multimap<int, std::shared_ptr<Job>> jobs{};
+  std::multimap<long, std::shared_ptr<Job>> jobs{};
 };
 
 template <typename _Callable, typename... _Args>
-std::shared_ptr<Job> Scheduler::Add(bool reiterable, int interval,
+std::shared_ptr<Job> Scheduler::Run(int interval,
                                     _Callable&& function,
                                     _Args&& ... args) {
-  auto job_ptr =
-      std::make_shared<Job>(reiterable, interval,
-                            std::bind(std::forward<_Callable>(function),
-                                      std::forward<_Args>(args)...));
-  
   std::lock_guard<std::mutex> lg(lock);
   
-  jobs.emplace(current_time_ + job_ptr->interval_, job_ptr);
-  return std::move(job_ptr);
+  auto it = jobs.emplace(
+      current_time_ + interval,
+      std::make_shared<Job>(true, interval,
+                            std::bind(std::forward<_Callable>(function),
+                                      std::forward<_Args>(args)...)));
+  
+  return it->second;
+}
+
+template <typename _Callable, typename... _Args>
+std::shared_ptr<Job> Scheduler::RunOnce(int interval,
+                                        _Callable&& function,
+                                        _Args&& ... args) {
+  std::lock_guard<std::mutex> lg(lock);
+  
+  auto it = jobs.emplace(
+      current_time_ + interval,
+      std::make_shared<Job>(false, interval,
+                            std::bind(std::forward<_Callable>(function),
+                                      std::forward<_Args>(args)...)));
+  
+  return it->second;
 }
 } // namespace cronjob

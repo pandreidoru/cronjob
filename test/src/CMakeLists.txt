@@ -5,13 +5,13 @@
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 if (Boost_FOUND)
     # Enable dynamic linking.
-    set(Boost_USE_STATIC_LIBS OFF)
+    set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_MULTITHREAD ON)
 
     add_executable(all_tests
                    test_entry.cc
                    job_test.cc
-                   ../inc/scheduler_test.h scheduler_test.cc
+                   scheduler_test.cc
                    ../../inc/scheduler.h ../../src/scheduler.cc)
 
     target_include_directories(all_tests
@@ -35,18 +35,30 @@ if (Boost_FOUND)
                               EXECUTABLE all_tests
                               DEPENDENCIES all_tests)
 
-    add_executable(stress_tests
+    add_executable(all_tests_ASan
                    test_entry.cc
-                   scheduler_stress_test.cpp
-                   ../inc/scheduler_test.h
+                   job_test.cc
+                   scheduler_test.cc
                    ../../inc/scheduler.h ../../src/scheduler.cc)
-
-    target_include_directories(stress_tests
+    target_include_directories(all_tests_ASan
                                PUBLIC
                                ${Boost_INCLUDE_DIR}
                                ${PROJECT_SOURCE_DIR}/inc
                                ${PROJECT_SOURCE_DIR}/test/inc)
+    target_link_libraries(all_tests_ASan ${Boost_LIBRARIES} pthread -fsanitize=address)
+    target_compile_options(all_tests_ASan PUBLIC $<$<CONFIG:DEBUG>: -fsanitize=address -fPIE -pie -O1 -fno-omit-frame-pointer -g>)
 
-    target_link_libraries(stress_tests ${Boost_LIBRARIES} pthread)
+    add_executable(all_tests_UBSan
+                   test_entry.cc
+                   job_test.cc
+                   scheduler_test.cc
+                   ../../inc/scheduler.h ../../src/scheduler.cc)
+    target_include_directories(all_tests_UBSan
+                               PUBLIC
+                               ${Boost_INCLUDE_DIR}
+                               ${PROJECT_SOURCE_DIR}/inc
+                               ${PROJECT_SOURCE_DIR}/test/inc)
+    target_link_libraries(all_tests_UBSan ${Boost_LIBRARIES} pthread -fsanitize=undefined)
+    target_compile_options(all_tests_UBSan PUBLIC $<$<CONFIG:DEBUG>: -fsanitize=undefined -fsanitize-address-use-after-scope -fPIE -pie -O1 -fno-omit-frame-pointer -g>)
 
 endif ()

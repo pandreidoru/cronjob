@@ -47,7 +47,8 @@ void Stress() {
     for (auto i = 0; i < iterations; ++i) {
       Print(std::cout, "list1 + ", (i % 10) + 1, "\n");
       std::lock_guard<std::mutex> lg(lock1);
-      jobs1.push_back(scheduler.Add(iterations % 2, (i % 10) + 1, [&] {}));
+      jobs1.push_back(scheduler.Run((i % 10) + 1, [&] {}));
+      jobs1.push_back(scheduler.RunOnce(((i * 2) % 10) + 1, [&] {}));
       Sleep(1);
     }
   });
@@ -71,7 +72,8 @@ void Stress() {
     for (auto i = 0; i < iterations; ++i) {
       Print(std::cout, "list2 + ", (i % 5) + 1, "\n");
       std::lock_guard<std::mutex> lg(lock2);
-      jobs2.push_back(scheduler.Add(iterations % 2, (i % 5) + 1, [&] {}));
+      jobs2.push_back(scheduler.Run((i % 5) + 1, [&] {}));
+      jobs2.push_back(scheduler.RunOnce((i % 5) + 1, [&] {}));
       Sleep(1);
     }
   });

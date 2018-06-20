@@ -7,7 +7,7 @@
 
 namespace cronjob {
 
-struct Job {  
+struct Job {
   Job() = default;
   
   /**
@@ -35,8 +35,8 @@ struct Job {
  private:
   friend class Scheduler;
   
-  bool reiterable_;
-  int interval_;
+  bool reiterable_ = false;
+  int interval_ = 1;
   std::function<void()> function_;
 };
 } // namespace cronjob
