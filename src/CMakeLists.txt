@@ -4,7 +4,7 @@
 # TARGET - Main project.
 add_executable(${PROJECT_NAME}
                main.cc
-               scheduler.cc ../inc/scheduler.h ../inc/job.h)
+               scheduler.cc ../inc/scheduler.h)
 
 target_include_directories(${PROJECT_NAME}
                            PUBLIC

@@ -23,13 +23,13 @@ void Sleep(int interval) {
   std::this_thread::sleep_for(std::chrono::milliseconds(interval * resolution));
 }
 
-template <typename Arg, typename... Args>
-void Print(std::ostream& out, Arg&& arg, Args&& ... args) {
+void Print(std::ostream&) {}
+
+template <typename T, typename... Args>
+void Print(std::ostream& out, T t, Args... args) {
   if (print_debug) {
-    out << std::forward<Arg>(arg);
-    using expander = int[];
-    (void)expander{ 0, (void(out << std::forward<Args>(args)), 0)... };
-    std::cout.flush();
+    out << t;
+    Print(out, std::forward<Args>(args)...);
   }
 }
 
@@ -41,10 +41,11 @@ void Stress() {
   std::list<std::shared_ptr<cronjob::Job>> jobs1;
   std::list<std::shared_ptr<cronjob::Job>> jobs2;
   
-  SetHighFrequency(true);
+  SetHighFrequency(false);
   
   auto adding_thread1 = std::thread([&] {
     for (auto i = 0; i < iterations; ++i) {
+      Print(std::cout);
       Print(std::cout, "list1 + ", (i % 10) + 1, "\n");
       std::lock_guard<std::mutex> lg(lock1);
       jobs1.push_back(scheduler.Run((i % 10) + 1, [&] {}));
@@ -96,7 +97,7 @@ void Stress() {
   auto time_thread1 = std::thread([&] {
     for (auto i = 0; i < iterations; ++i) {
       Print(std::cout, "OnNewTime(10)", "\n");
-      scheduler.OnNewTime({ 10, 0 });
+      scheduler.OnNewTime({10, 0});
       Sleep(1);
     }
   });
@@ -104,7 +105,7 @@ void Stress() {
   auto time_thread2 = std::thread([&] {
     for (auto i = 0; i < iterations; ++i) {
       Print(std::cout, "OnNewTime(30)", "\n");
-      scheduler.OnNewTime({ 30, 0 });
+      scheduler.OnNewTime({30, 0});
       Sleep(1);
     }
   });
@@ -112,7 +113,7 @@ void Stress() {
   auto time_thread3 = std::thread([&] {
     for (auto i = 0; i < iterations; ++i) {
       Print(std::cout, "OnNewTime(50)", "\n");
-      scheduler.OnNewTime({ 50, 0 });
+      scheduler.OnNewTime({50, 0});
       Sleep(2);
     }
   });

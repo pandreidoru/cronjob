@@ -7,6 +7,7 @@
 #include "scheduler.h"
 
 #include <thread>
+#include <condition_variable>
 
 struct SchedulerFixture {
   cronjob::Scheduler scheduler;
@@ -87,23 +88,23 @@ BOOST_AUTO_TEST_CASE(Double_remove_does_not_throw_exception) {
 
 BOOST_AUTO_TEST_CASE(
     Remove_on_invalid_reference_to_a_RunOnce_job_set_it_to_nullptr) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.OnNewTime({ 10, 0 });
+  scheduler.OnNewTime({10, 0});
   
-  auto job1 = scheduler.RunOnce(1, [&] { ++count_executed1; });
-  auto job2 = scheduler.RunOnce(2, [&] { ++count_executed2; });
+  auto job1 = scheduler.RunOnce(1, [&] { ++count_job1; });
+  auto job2 = scheduler.RunOnce(2, [&] { ++count_job2; });
   
-  scheduler.OnNewTime({ 5, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  scheduler.OnNewTime({5, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
   BOOST_TEST(job1 != nullptr);
   BOOST_TEST(job2 != nullptr);
   
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
   BOOST_TEST(job1 != nullptr);
   BOOST_TEST(job2 != nullptr);
   
@@ -120,50 +121,50 @@ BOOST_AUTO_TEST_SUITE(OnNewTime)
 BOOST_AUTO_TEST_SUITE(Same_time)
 
 BOOST_AUTO_TEST_CASE(On_empty_scheduler_does_nothing) {
-  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({ 0, 0 }));
+  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({0, 0}));
   
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  auto job1 = scheduler.Run(1, [&] { ++count_executed1; });
-  auto job2 = scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 5, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  auto job1 = scheduler.Run(1, [&] { ++count_job1; });
+  auto job2 = scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.OnNewTime({5, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
   
   scheduler.Remove(job1);
   scheduler.Remove(job2);
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
 }
 
 BOOST_AUTO_TEST_CASE(After_initial_time_does_nothing) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 0, 0 });
-  scheduler.OnNewTime({ 0, 0 });
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.OnNewTime({0, 0});
+  scheduler.OnNewTime({0, 0});
   
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
 }
 
 BOOST_AUTO_TEST_CASE(After_not_initial_time_does_nothing) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
   
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // Same_time
@@ -171,55 +172,55 @@ BOOST_AUTO_TEST_SUITE_END() // Same_time
 BOOST_AUTO_TEST_SUITE(Past_time)
 
 BOOST_AUTO_TEST_CASE(On_empty_scheduler_does_nothing) {
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({ 5, 0 }));
+  scheduler.OnNewTime({10, 0});
+  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({5, 0}));
 }
 
 BOOST_AUTO_TEST_CASE(Does_not_fire_any_job_but_reschedules_repetitive_jobs) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
-  auto count_executed3 = 0;
-  auto count_executed4 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
+  auto count_job3 = 0;
+  auto count_job4 = 0;
   
-  scheduler.OnNewTime({ 10, 0 });
+  scheduler.OnNewTime({10, 0});
   
-  auto job1 = scheduler.Run(1, [&] { ++count_executed1; });
-  auto job2 = scheduler.Run(2, [&] { ++count_executed2; });
-  auto job3 = scheduler.RunOnce(3, [&] { ++count_executed3; });
-  auto job4 = scheduler.RunOnce(4, [&] { ++count_executed4; });
+  auto job1 = scheduler.Run(1, [&] { ++count_job1; });
+  auto job2 = scheduler.Run(2, [&] { ++count_job2; });
+  auto job3 = scheduler.RunOnce(3, [&] { ++count_job3; });
+  auto job4 = scheduler.RunOnce(4, [&] { ++count_job4; });
   
-  scheduler.OnNewTime({ 5, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({5, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
 }
 
 BOOST_AUTO_TEST_CASE(
     Removes_RunOnce_jobs_just_from_scheduler_reference_remains_invalid) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.OnNewTime({ 10, 0 });
+  scheduler.OnNewTime({10, 0});
   
-  auto job1 = scheduler.RunOnce(1, [&] { ++count_executed1; });
-  auto job2 = scheduler.RunOnce(2, [&] { ++count_executed2; });
+  auto job1 = scheduler.RunOnce(1, [&] { ++count_job1; });
+  auto job2 = scheduler.RunOnce(2, [&] { ++count_job2; });
   
-  scheduler.OnNewTime({ 5, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  scheduler.OnNewTime({5, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
   BOOST_TEST(job1 != nullptr);
   BOOST_TEST(job2 != nullptr);
   
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
   BOOST_TEST(job1 != nullptr);
   BOOST_TEST(job2 != nullptr);
 }
@@ -229,150 +230,150 @@ BOOST_AUTO_TEST_SUITE_END() // Past_time
 BOOST_AUTO_TEST_SUITE(Future_time)
 
 BOOST_AUTO_TEST_CASE(On_empty_scheduler_does_nothing) {
-  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({ 10, 0 }));
+  BOOST_CHECK_NO_THROW(scheduler.OnNewTime({10, 0}));
   
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  auto job1 = scheduler.Run(1, [&] { ++count_executed1; });
-  auto job2 = scheduler.RunOnce(1, [&] { ++count_executed2; });
+  auto job1 = scheduler.Run(1, [&] { ++count_job1; });
+  auto job2 = scheduler.RunOnce(1, [&] { ++count_job2; });
   scheduler.Remove(job1);
   scheduler.Remove(job2);
-  scheduler.OnNewTime({ 20, 0 });
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  scheduler.OnNewTime({20, 0});
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
 }
 
 BOOST_AUTO_TEST_CASE(No_job_executed_if_new_time_is_too_early) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.Run(10, [&] { ++count_executed1; });
-  scheduler.RunOnce(20, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 5, 0 });
+  scheduler.Run(10, [&] { ++count_job1; });
+  scheduler.RunOnce(20, [&] { ++count_job2; });
+  scheduler.OnNewTime({5, 0});
   
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
 }
 
 BOOST_AUTO_TEST_CASE(No_reschedule_if_new_time_is_too_early) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.Run(10, [&] { ++count_executed1; });
-  scheduler.RunOnce(20, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 5, 0 });
+  scheduler.Run(10, [&] { ++count_job1; });
+  scheduler.RunOnce(20, [&] { ++count_job2; });
+  scheduler.OnNewTime({5, 0});
   
-  BOOST_TEST(count_executed1 == 0);
-  BOOST_TEST(count_executed2 == 0);
+  BOOST_TEST(count_job1 == 0);
+  BOOST_TEST(count_job2 == 0);
   
-  scheduler.OnNewTime({ 100, 0 });
+  scheduler.OnNewTime({100, 0});
   
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
 }
 
 BOOST_AUTO_TEST_CASE(Jobs_are_executed_just_once) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.OnNewTime({ 10, 0 });
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.OnNewTime({10, 0});
   
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
 }
 
 BOOST_AUTO_TEST_CASE(Only_expired_jobs_are_executed) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
-  auto count_executed3 = 0;
-  auto count_executed4 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
+  auto count_job3 = 0;
+  auto count_job4 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.Run(2, [&] { ++count_executed2; });
-  scheduler.Run(10, [&] { ++count_executed3; });
-  scheduler.Run(20, [&] { ++count_executed4; });
-  scheduler.OnNewTime({ 5, 0 });
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.Run(2, [&] { ++count_job2; });
+  scheduler.Run(10, [&] { ++count_job3; });
+  scheduler.Run(20, [&] { ++count_job4; });
+  scheduler.OnNewTime({5, 0});
   
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
 }
 
 BOOST_AUTO_TEST_CASE(Only_repetitive_jobs_are_rescheduled_after_executed_once) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
-  auto count_executed3 = 0;
-  auto count_executed4 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
+  auto count_job3 = 0;
+  auto count_job4 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.Run(30, [&] { ++count_executed3; });
-  scheduler.RunOnce(40, [&] { ++count_executed4; });
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.Run(30, [&] { ++count_job3; });
+  scheduler.RunOnce(40, [&] { ++count_job4; });
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 20, 0 });
-  BOOST_TEST(count_executed1 == 2);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({20, 0});
+  BOOST_TEST(count_job1 == 2);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // Future_time
 
 BOOST_AUTO_TEST_CASE(Mixed_times) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
-  auto count_executed3 = 0;
-  auto count_executed4 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
+  auto count_job3 = 0;
+  auto count_job4 = 0;
   
-  scheduler.Run(1, [&] { ++count_executed1; });
-  scheduler.RunOnce(2, [&] { ++count_executed2; });
-  scheduler.Run(100, [&] { ++count_executed3; });
-  scheduler.Run(200, [&] { ++count_executed4; });
+  scheduler.Run(1, [&] { ++count_job1; });
+  scheduler.RunOnce(2, [&] { ++count_job2; });
+  scheduler.Run(100, [&] { ++count_job3; });
+  scheduler.Run(200, [&] { ++count_job4; });
   
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 4, 0 });
-  BOOST_TEST(count_executed1 == 2);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({4, 0});
+  BOOST_TEST(count_job1 == 2);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 3, 0 });
-  BOOST_TEST(count_executed1 == 2);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({3, 0});
+  BOOST_TEST(count_job1 == 2);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed1 == 2);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job1 == 2);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 3);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 0);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 3);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 0);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 300, 0 });
-  BOOST_TEST(count_executed1 == 4);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 1);
-  BOOST_TEST(count_executed4 == 1);
+  scheduler.OnNewTime({300, 0});
+  BOOST_TEST(count_job1 == 4);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 1);
+  BOOST_TEST(count_job4 == 1);
 }
 
 BOOST_AUTO_TEST_CASE(Jobs_could_add_other_jobs) {
@@ -395,22 +396,22 @@ BOOST_AUTO_TEST_CASE(Jobs_could_add_other_jobs) {
     scheduler.RunOnce(10, [&] { ++count_once; });
   });
   
-  scheduler.OnNewTime({ 100, 0 });
+  scheduler.OnNewTime({100, 0});
   BOOST_TEST(count_repetitive1 == 1);
   BOOST_TEST(count_repetitive2 == 1);
   BOOST_TEST(count_once == 1);
   
-  scheduler.OnNewTime({ 200, 0 });
+  scheduler.OnNewTime({200, 0});
   BOOST_TEST(count_repetitive1 == (2 + 1));
   BOOST_TEST(count_repetitive2 == (2 + 1));
   BOOST_TEST(count_once == (1 + 1));
   
-  scheduler.OnNewTime({ 300, 0 });
+  scheduler.OnNewTime({300, 0});
   BOOST_TEST(count_repetitive1 == (3 + 1 + 2));
   BOOST_TEST(count_repetitive2 == (3 + 1 + 2));
   BOOST_TEST(count_once == (1 + 1));
   
-  scheduler.OnNewTime({ 400, 0 });
+  scheduler.OnNewTime({400, 0});
   BOOST_TEST(count_repetitive1 == (4 + 1 + 2 + 3));
   BOOST_TEST(count_repetitive2 == (4 + 1 + 2 + 3));
   BOOST_TEST(count_once == (1 + 1));
@@ -429,28 +430,28 @@ BOOST_AUTO_TEST_CASE(Job_could_remove_another_job) {
   });
   BOOST_TEST(jobs.size() == 2);
   
-  scheduler.OnNewTime({ 100, 0 });
+  scheduler.OnNewTime({100, 0});
   BOOST_TEST(jobs.size() == 1);
   
-  scheduler.OnNewTime({ 200, 0 });
+  scheduler.OnNewTime({200, 0});
   BOOST_TEST(jobs.size() == 0);
 }
 
 BOOST_AUTO_TEST_CASE(Resolution_is_of_one_second) {
-  auto count_executed = 0;
+  auto count_job = 0;
   
-  scheduler.Run(1, [&] { ++count_executed; });
-  scheduler.OnNewTime({ 0, 10 });
-  BOOST_TEST(count_executed == 0);
+  scheduler.Run(1, [&] { ++count_job; });
+  scheduler.OnNewTime({0, 10});
+  BOOST_TEST(count_job == 0);
   
-  scheduler.OnNewTime({ 2, 0 });
-  BOOST_TEST(count_executed == 1);
+  scheduler.OnNewTime({2, 0});
+  BOOST_TEST(count_job == 1);
   
-  scheduler.OnNewTime({ 2, 1 });
-  BOOST_TEST(count_executed == 1);
+  scheduler.OnNewTime({2, 1});
+  BOOST_TEST(count_job == 1);
   
-  scheduler.OnNewTime({ 2, 10 });
-  BOOST_TEST(count_executed == 1);
+  scheduler.OnNewTime({2, 10});
+  BOOST_TEST(count_job == 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // OnNewTime
@@ -462,36 +463,36 @@ BOOST_AUTO_TEST_SUITE(Multiple_threads)
 BOOST_AUTO_TEST_SUITE(Add)
 
 BOOST_AUTO_TEST_CASE(Add_jobs_is_safe) {
-  auto count_executed1 = 0;
-  auto count_executed2 = 0;
-  auto count_executed3 = 0;
-  auto count_executed4 = 0;
+  auto count_job1 = 0;
+  auto count_job2 = 0;
+  auto count_job3 = 0;
+  auto count_job4 = 0;
   
   auto thread1 =
-      std::thread([&] { scheduler.Run(1, [&] { ++count_executed1; }); });
+      std::thread([&] { scheduler.Run(1, [&] { ++count_job1; }); });
   auto thread2 =
-      std::thread([&] { scheduler.RunOnce(1, [&] { ++count_executed2; }); });
+      std::thread([&] { scheduler.RunOnce(1, [&] { ++count_job2; }); });
   auto thread3 =
-      std::thread([&] { scheduler.Run(2, [&] { ++count_executed3; }); });
+      std::thread([&] { scheduler.Run(2, [&] { ++count_job3; }); });
   auto thread4 =
-      std::thread([&] { scheduler.Run(20, [&] { ++count_executed4; }); });
+      std::thread([&] { scheduler.Run(20, [&] { ++count_job4; }); });
   
   thread1.join();
   thread2.join();
   thread3.join();
   thread4.join();
   
-  scheduler.OnNewTime({ 10, 0 });
-  BOOST_TEST(count_executed1 == 1);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 1);
-  BOOST_TEST(count_executed4 == 0);
+  scheduler.OnNewTime({10, 0});
+  BOOST_TEST(count_job1 == 1);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 1);
+  BOOST_TEST(count_job4 == 0);
   
-  scheduler.OnNewTime({ 30, 0 });
-  BOOST_TEST(count_executed1 == 2);
-  BOOST_TEST(count_executed2 == 1);
-  BOOST_TEST(count_executed3 == 2);
-  BOOST_TEST(count_executed4 == 1);
+  scheduler.OnNewTime({30, 0});
+  BOOST_TEST(count_job1 == 2);
+  BOOST_TEST(count_job2 == 1);
+  BOOST_TEST(count_job3 == 2);
+  BOOST_TEST(count_job4 == 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // Run
@@ -552,42 +553,60 @@ BOOST_AUTO_TEST_SUITE_END() // Remove
 BOOST_AUTO_TEST_SUITE(OnNewTime)
 
 BOOST_AUTO_TEST_CASE(Concurent_calling_is_safe) {
-  auto count_repetitive = 0;
-  auto count_once = 0;
+  std::atomic<int> count_repetitive;
+  count_repetitive = 0;
+  std::atomic<int> count_once;
+  count_once = 0;
+  bool is_add_thread_done = false;
+  std::condition_variable cv;
+  std::mutex lock;
   auto add_thread =
       std::thread([&] {
-        scheduler.Run(1, [&] {
-          ++count_repetitive;
-          // Waits to allow onnewtime_thread2 to overlap onnewtime_thread1.
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        });
-        scheduler.RunOnce(1, [&] {
-          ++count_once;
-          // Waits to allow onnewtime_thread2 to overlap onnewtime_thread1.
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        });
+        {
+          std::lock_guard<std::mutex> lg(lock);
+    
+          scheduler.Run(1, [&] {
+            ++count_repetitive;
+            // Waits to allow onnewtime_thread2 to overlap onnewtime_thread1.
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          });
+          scheduler.RunOnce(2, [&] {
+            ++count_once;
+            // Waits to allow onnewtime_thread2 to overlap onnewtime_thread1.
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          });
+    
+          is_add_thread_done = true;
+        }
+  
+        cv.notify_all();
       });
   
-  auto onnewthread_thread1 = std::thread([&] {
-    // Waits for add_thread to add the jobs.
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    scheduler.OnNewTime({ 10, 0 });
+  auto onnewtime_thread1 = std::thread([&] {
+    std::unique_lock<std::mutex> lg(lock);
+    cv.wait(lg, [&] { return is_add_thread_done; });
+    lg.unlock();
+    
+    scheduler.OnNewTime({10, 0});
   });
   
-  auto onnewthread_thread2 = std::thread([&] {
-    // Waits for add_thread to add the job and onnewthread_thread1.
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    scheduler.OnNewTime({ 20, 0 });
+  auto onnewtime_thread2 = std::thread([&] {
+    std::unique_lock<std::mutex> lg(lock);
+    cv.wait(lg, [&] { return is_add_thread_done; });
+    lg.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    scheduler.OnNewTime({20, 0});
   });
   
   add_thread.join();
-  onnewthread_thread1.join();
-  onnewthread_thread2.join();
+  onnewtime_thread1.join();
+  onnewtime_thread2.join();
   
   BOOST_TEST(count_repetitive == 2);
   BOOST_TEST(count_once == 1);
   
-  scheduler.OnNewTime({ 30, 0 });
+  scheduler.OnNewTime({30, 0});
   BOOST_TEST(count_repetitive == 3);
   BOOST_TEST(count_once == 1);
 }
@@ -619,7 +638,7 @@ BOOST_AUTO_TEST_CASE(While_another_thread_calls_Add_is_safe) {
   auto onnewthread_thread = std::thread([&] {
     // Waits for add_thread1 to add the jobs.
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    scheduler.OnNewTime({ 10, 0 });
+    scheduler.OnNewTime({10, 0});
   });
   
   auto add_thread2 = std::thread([&] {
@@ -642,7 +661,7 @@ BOOST_AUTO_TEST_CASE(While_another_thread_calls_Add_is_safe) {
   BOOST_TEST(job3 != nullptr);
   BOOST_TEST(job4 != nullptr);
   
-  scheduler.OnNewTime({ 20, 0 });
+  scheduler.OnNewTime({20, 0});
   BOOST_TEST(count_repetitive1 == 2);
   BOOST_TEST(count_repetitive2 == 1);
   BOOST_TEST(count_once1 == 1);
@@ -672,7 +691,7 @@ BOOST_AUTO_TEST_CASE(While_another_thread_calls_Remove_is_safe) {
   auto onnewthread_thread = std::thread([&] {
     // Waits for add_thread to add the jobs.
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    scheduler.OnNewTime({ 10, 0 });
+    scheduler.OnNewTime({10, 0});
   });
   
   auto remove_thread = std::thread([&] {
@@ -759,21 +778,21 @@ BOOST_AUTO_TEST_CASE(Stress1) {
     
     auto time_thread1 = std::thread([&] {
       for (auto i = 0; i < iterations; ++i) {
-        scheduler.OnNewTime({ 10, 0 });
+        scheduler.OnNewTime({10, 0});
         std::this_thread::sleep_for(std::chrono::milliseconds(resolution));
       }
     });
     
     auto time_thread2 = std::thread([&] {
       for (auto i = 0; i < iterations; ++i) {
-        scheduler.OnNewTime({ 30, 0 });
+        scheduler.OnNewTime({30, 0});
         std::this_thread::sleep_for(std::chrono::milliseconds(resolution));
       }
     });
     
     auto time_thread3 = std::thread([&] {
       for (auto i = 0; i < iterations; ++i) {
-        scheduler.OnNewTime({ 50, 0 });
+        scheduler.OnNewTime({50, 0});
         std::this_thread::sleep_for(std::chrono::milliseconds(2 * resolution));
       }
     });

@@ -9,7 +9,7 @@ namespace cronjob {
 void Scheduler::OnNewTime(const timeval& time) {
   std::list<std::shared_ptr<Job>> jobs_to_run;
   {
-    std::lock_guard<std::mutex> lg(lock);
+    std::lock_guard<std::mutex> lg(lock_);
     
     if (current_time_ == time.tv_sec) {
       return;
@@ -17,8 +17,8 @@ void Scheduler::OnNewTime(const timeval& time) {
     
     auto old_time = current_time_;
     current_time_ = time.tv_sec;
-    
-    if (jobs.empty()) {
+  
+    if (jobs_.empty()) {
       return;
     }
     
@@ -38,28 +38,26 @@ void Scheduler::OnNewTime(const timeval& time) {
 
 // Get lock before calling this method.
 void Scheduler::PastReschedule() {
-  decltype(jobs) new_jobs;
+  auto new_jobs = decltype(jobs_){};
   
-  for (auto& time_job : jobs) {
+  for (auto& time_job : jobs_) {
     if (time_job.second->reiterable_) {
       new_jobs.emplace(current_time_ + time_job.second->interval_,
                        std::move(time_job.second));
-    } else {
-      time_job.second.reset();
     }
   }
-  jobs = std::move(new_jobs);
+  jobs_ = std::move(new_jobs);
 }
 
 // Get lock before calling this method.
 void Scheduler::FutureReschedule(
     const std::list<std::shared_ptr<Job>>& jobs_to_run) {
-  auto end_of_jobs_to_run = jobs.upper_bound(current_time_);
-  jobs.erase(jobs.begin(), end_of_jobs_to_run);
+  auto end_of_jobs_to_run = jobs_.upper_bound(current_time_);
+  jobs_.erase(jobs_.begin(), end_of_jobs_to_run);
   
   for (const auto& job : jobs_to_run) {
     if (job->reiterable_) {
-      jobs.emplace(current_time_ + job->interval_, job);
+      jobs_.emplace(current_time_ + job->interval_, job);
     }
   }
 }
@@ -69,10 +67,10 @@ void Scheduler::GetJobsToRun(
     std::list<std::shared_ptr<Job>>& jobs_to_run) const {
   
   // Future time => Run once all jobs between old_time and current_time_.
-  auto end_of_jobs_to_run = jobs.upper_bound(current_time_);
+  auto end_of_jobs_to_run = jobs_.upper_bound(current_time_);
   
   // Backup jobs to be run.
-  for (auto time_job = jobs.begin();
+  for (auto time_job = jobs_.begin();
        time_job != end_of_jobs_to_run;
        ++time_job) {
     jobs_to_run.push_back(time_job->second);
@@ -80,12 +78,12 @@ void Scheduler::GetJobsToRun(
 }
 
 void Scheduler::Remove(std::shared_ptr<Job>& job) {
-  std::lock_guard<std::mutex> lg(lock);
+  std::lock_guard<std::mutex> lg(lock_);
   if (job) {
-    auto range = jobs.equal_range(current_time_ + job->interval_);
+    auto range = jobs_.equal_range(current_time_ + job->interval_);
     for (auto iter = range.first; iter != range.second; ++iter) {
       if (iter->second == job) {
-        jobs.erase(iter);
+        jobs_.erase(iter);
         break;
       }
     }
