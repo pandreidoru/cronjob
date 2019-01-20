@@ -23,7 +23,7 @@ struct Job {
    *                   - false - One-shoot job.
    * @param interval   - Job's reschedule interval.
    * @param function   - Job to execute.
-   * @param args       - Job's parameters.
+   * @param args       - Job's arguments.
    */
   template <typename _Callable, typename... _Args>
   explicit Job(bool reiterable, int interval,
@@ -67,7 +67,7 @@ class Scheduler {
    * @tparam _Args     - Callable's parameter-pack.
    * @param interval   - Job's reschedule interval.
    * @param function   - Job to execute.
-   * @param args       - Job's parameters.
+   * @param args       - Job's arguments.
    * @return
    */
   template <typename _Callable, typename... _Args>
@@ -81,7 +81,7 @@ class Scheduler {
  * @tparam _Args     - Callable's parameter-pack.
  * @param interval   - After how many seconds the job will run once.
  * @param function   - Job to execute.
- * @param args       - Job's parameters.
+ * @param args       - Job's arguments.
  * @return
  */
   template <typename _Callable, typename... _Args>
@@ -98,29 +98,46 @@ class Scheduler {
  
  private:
   /**
+  * @brief Add a new job to the @Scheduler.
+  * @tparam _Callable - A Callable type.
+  * @tparam _Args     - Callable's parameter-pack.
+  * @param reiterable - true - The job will be rescheduled.
+  *                   - false - One-shoot job.
+  * @param interval   - After how many seconds the job will run once.
+  * @param function   - Job to execute.
+  * @param args       - Job's arguments.
+  * @return
+  */
+  template <typename _Callable, typename... _Args>
+  std::shared_ptr<Job> Add(bool reiterable, int interval,
+                           _Callable&& function,
+                           _Args&& ... args);
+  
+  /**
    * @brief Reschedule all reiterable jobs in case of updating the
    * @current_time_ with a past time.
-   * @note Get lock before calling this method.
+   * @note - Get lock before calling this method.
    */
   void PastReschedule();
   
   /**
    * @brief Reschedule all reiterable jobs in case of updating the
    * @current_time_ with a future time.
-   * @note Get lock before calling this method.
+   * @param jobs_to_run - All jobs that needs to be rescheduled.
+   * @note - Get lock before calling this method.
    */
   void FutureReschedule(const std::list<std::shared_ptr<Job>>& jobs_to_run);
   
   /**
    * @brief Get all jobs that needs to be executed.
    * @param jobs_to_run - All jobs that needs to be executed.
-   * @note Get lock before calling this method.
+   * @note - Get lock before calling this method.
    */
   void GetJobsToRun(std::list<std::shared_ptr<Job>>& jobs_to_run) const;
   
   std::mutex lock_;
   long current_time_ = 0;
-  // Maps moments of time to execute jobs_ with the corresponding jobs_.
+  // Maps moments of time (to execute jobs_) with the corresponding jobs_.
   std::multimap<long, std::shared_ptr<Job>> jobs_{};
 };
 
@@ -140,28 +157,31 @@ template <typename _Callable, typename... _Args>
 std::shared_ptr<Job> Scheduler::Run(int interval,
                                     _Callable&& function,
                                     _Args&& ... args) {
-  std::lock_guard<std::mutex> lg(lock_);
-  
-  auto it = jobs_.emplace(
-      current_time_ + interval,
-      std::make_shared<Job>(true, interval,
-                            std::bind(std::forward<_Callable>(function),
-                                      std::forward<_Args>(args)...)));
-  
-  return it->second;
+  return Add(true, interval,
+             std::forward<_Callable>(function),
+             std::forward<_Args>(args)...);
 }
 
 template <typename _Callable, typename... _Args>
 std::shared_ptr<Job> Scheduler::RunOnce(int interval,
                                         _Callable&& function,
                                         _Args&& ... args) {
+  return Add(false, interval,
+             std::forward<_Callable>(function),
+             std::forward<_Args>(args)...);
+}
+
+template <typename _Callable, typename... _Args>
+std::shared_ptr<Job> Scheduler::Add(bool reiterable, int interval,
+                                    _Callable&& function,
+                                    _Args&& ... args) {
   std::lock_guard<std::mutex> lg(lock_);
   
   auto it = jobs_.emplace(
       current_time_ + interval,
-      std::make_shared<Job>(false, interval,
-                            std::bind(std::forward<_Callable>(function),
-                                      std::forward<_Args>(args)...)));
+      std::make_shared<Job>(reiterable, interval,
+                            std::forward<_Callable>(function),
+                            std::forward<_Args>(args)...));
   
   return it->second;
 }

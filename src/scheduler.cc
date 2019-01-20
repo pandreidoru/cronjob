@@ -38,7 +38,7 @@ void Scheduler::OnNewTime(const timeval& time) {
 
 // Get lock before calling this method.
 void Scheduler::PastReschedule() {
-  auto new_jobs = decltype(jobs_){};
+  auto new_jobs = std::multimap<long, std::shared_ptr<Job>>{};
   
   for (auto& time_job : jobs_) {
     if (time_job.second->reiterable_) {
@@ -46,6 +46,7 @@ void Scheduler::PastReschedule() {
                        std::move(time_job.second));
     }
   }
+  
   jobs_ = std::move(new_jobs);
 }
 
@@ -65,8 +66,6 @@ void Scheduler::FutureReschedule(
 // Get lock before calling this method.
 void Scheduler::GetJobsToRun(
     std::list<std::shared_ptr<Job>>& jobs_to_run) const {
-  
-  // Future time => Run once all jobs between old_time and current_time_.
   auto end_of_jobs_to_run = jobs_.upper_bound(current_time_);
   
   // Backup jobs to be run.
